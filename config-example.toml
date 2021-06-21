@@ -1,0 +1,45 @@
+# [Download Cache Location]
+# This is where the download cache located.
+# If the folder is not exist, it will be created.
+# You can safely delete it when the program is not running.
+#     type: string
+#     default: "./tmp"
+cache-dir = "./tmp"
+
+# [Chunk Size]
+# If you don't know what is this, don't change it.
+#     type: int, (chunk-size % 1024) == 0
+#     default: 4096
+chunk-size = 4096
+
+# [Change CDN Host]
+# Leave it commeted unless you have network problem.
+#     type: <not set> | string
+# cdn = "upos-sz-mirrorcos.bilivideo.com"
+# cdn = "upos-sz-mirrorhw.bilivideo.com"
+
+# section name
+#    Section name can be any value follows TOML rule. It's only an alias used by the bget tool.
+[luotianyi-2021]
+# [FID]
+# Find it in urls like https://space.bilibili.com/36081646/favlist?fid=976082846&ftype=create
+id = 1159955846
+
+# [Switches]
+# Use switch below to turn on/off download things
+# If a switch is not set, by default it is off (false)
+danmaku = true
+cover = true
+meta = true
+dash = true
+aiff = true
+flac = true
+
+# section name #2
+[luotianyi-2020]
+id = 976082846
+danmaku = false
+cover = false
+dash = true
+aiff = false
+flac = false
