@@ -1,1 +1,0 @@
-rd /s /q bget.egg-info build dist downloads tmp

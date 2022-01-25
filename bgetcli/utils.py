@@ -1,93 +1,72 @@
-import copy
-import dataclasses
-import os
-import toml
 import argparse
-from os import path
-from datetime import datetime
+import os
 from typing import Tuple, Optional
-from bgetcli.const import WINDOWS_ESCAPE_CHARS, OUT
-from bgetcli.logger import Logger
-from bgetcli.model import Config, FolderConfig, Runtime
+from urllib.parse import urlparse, parse_qs
+
+import bgetlib
 
 
-def abspath(name, base: Optional[str] = None):
-    if base is None:
-        base = os.getcwd()
-    return path.abspath(path.join(base, name))
+def ensure_file_directory_created(file_path: str):
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
 
-def win_escape(src: str) -> str:
-    dest = src
-    for search, replace in WINDOWS_ESCAPE_CHARS.items():
-        dest = dest.replace(search, replace)
-    return dest
+def list_unique(original_list: list):
+    return list(set(original_list))
 
 
-def read_config(logger: Logger, args: argparse.Namespace) -> Tuple[Config, datetime]:
-    config_path = abspath(args.config)
-    config_base = path.dirname(config_path)
-    config_toml = toml.load(config_path)
-    head_path = abspath(args.head)
-    logger.log("Loaded config: {}".format(abspath(args.config)))
-    logger.log("Using HEAD file: {}".format(head_path))
-
-    folder = config_toml[args.alias]
-    config = Config(
-        id=config_toml[args.alias]["id"],
-        name=args.alias,
-        cache_dir=abspath(config_toml.get("cache-dir") or "./tmp", base=config_base),
-        chunk_size=(config_toml.get("chunk-size") or 4096),
-        cdn=config_toml.get("cdn"),
-        folder=FolderConfig(
-            danmaku_path=folder.get("danmaku") is True or None,
-            cover_path=folder.get("cover") is True or None,
-            meta_path=folder.get("meta") is True or None,
-            dash_path=folder.get("dash") is True or None,
-            aiff_path=folder.get("aiff") is True or None,
-            flac_path=folder.get("flac") is True or None,
-        )
-    )
-
-    head: datetime = datetime.fromtimestamp(86400)
-    if path.exists(head_path):
-        head = toml.load(head_path).get(args.alias) or head
-    return config, head
+def auto_format(fmt_string: str, video: dict, part_index: Optional[int] = 0, ext: str = ""):
+    title = bgetlib.utils.ntfs_escape(video["title"])
+    if part_index is None:
+        part_index = 0
+    kwargs = {
+        "aid": video["aid"],
+        "bvid": video["bvid"],
+        "title": title,
+        "up": video["owner"]["name"],
+        "up_uid": video["owner"]["mid"],
+        "p": part_index + 1,
+        "parts": len(video["pages"]),
+        "part_name": video["pages"][part_index]["part"],
+        "cid": video["pages"][part_index]["cid"],
+        "ext": ext
+    }
+    return fmt_string.format(**kwargs)
 
 
-def outdirs_init(rt: Runtime):
-    OUTDIRS = OUT.DIR()
-    OUTDIRS.DANMAKU = abspath(OUT.DIR.DANMAKU.format(out_dir=rt.out_dir, name=rt.config.name))
-    OUTDIRS.COVER = abspath(OUT.DIR.COVER.format(out_dir=rt.out_dir, name=rt.config.name))
-    OUTDIRS.META = abspath(OUT.DIR.META.format(out_dir=rt.out_dir, name=rt.config.name))
-    OUTDIRS.DASH = abspath(OUT.DIR.DASH.format(out_dir=rt.out_dir, name=rt.config.name))
-    OUTDIRS.AIFF = abspath(OUT.DIR.AIFF.format(out_dir=rt.out_dir, name=rt.config.name))
-    OUTDIRS.FLAC = abspath(OUT.DIR.FLAC.format(out_dir=rt.out_dir, name=rt.config.name))
-    return OUTDIRS
+# noinspection PyBroadException
+def parse_resources(args: argparse.Namespace, config_dict: dict) -> Tuple[str, int]:
+    resource_name: str = args.resource.strip()
 
+    # section
+    if args.section:
+        section = config_dict["section"].get(resource_name) or {}
+        fid = section.get("id") or None
+        if fid is None:
+            return "notfound", 0
+        return "fav", int(fid)
 
-def dest_path(rt: Runtime, filename_template: str, **kwargs):
-    # noinspection PyPep8Naming,SpellCheckingInspection
-    OUTDIRS = outdirs_init(rt)
-    out_dir = {
-        OUT.FILENAME.DANMAKU: OUTDIRS.DANMAKU,
-        OUT.FILENAME.COVER:   OUTDIRS.COVER,
-        OUT.FILENAME.META:    OUTDIRS.META,
-        OUT.FILENAME.DASH:    OUTDIRS.DASH,
-        OUT.FILENAME.AIFF:    OUTDIRS.AIFF,
-        OUT.FILENAME.FLAC:    OUTDIRS.FLAC,
+    # url
+    if resource_name.startswith("http://") or resource_name.startswith("https://"):
+        url = urlparse(resource_name)
+        if url.netloc == "space.bilibili.com":
+            try:
+                return "fav", int(parse_qs(url.query).get("fid")[0])
+            except:
+                pass
+        resource_name = os.path.basename(url.path).strip()
 
-    }[filename_template]
-    filename = filename_template.format(**kwargs)
-    return "{}/{}".format(out_dir, filename)
-
-
-def class2dict(clazz):
-    data = copy.copy(clazz.__dict__)
-    for k, v in clazz.__dict__.items():
-        if dataclasses.is_dataclass(v):
-            data[k] = copy.copy(v.__dict__)
-        if isinstance(v, list):
-            data[k] = [copy.copy(i.__dict__) for i in v]
-    return data
-
+    # bare av/bv id
+    try:
+        aid = int(resource_name)
+        return "video", aid
+    except ValueError:
+        pass
+    if resource_name.lower().startswith("av"):
+        return "video", int(resource_name[2:])
+    if resource_name.lower().startswith("bv"):
+        try:
+            aid = bgetlib.utils.bv2av(resource_name)
+            return "video", aid
+        except:
+            pass
+    return "unknown", 0
