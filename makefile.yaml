@@ -1,0 +1,19 @@
+targets:
+- name: build
+  prerequisites: [clean]
+  script: |
+    python -m venv build.venv
+    call build.venv\Scripts\activate
+    pip3 install -r requirements.txt
+    pip3 install setuptools wheel
+    setup.py sdist bdist_wheel
+    call build.venv\Scripts\deactivate
+    for /D %%i in (*.egg-info) do rd /S /Q "%%i"
+    rd /S /Q build.venv build
+
+- name: clean
+  prerequisites: []
+  script: |
+    rd /S /Q dist
+    for /D %%i in (*.egg-info) do rd /S /Q "%%i"
+    rd /S /Q build.venv build

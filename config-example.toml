@@ -1,45 +1,72 @@
-# [Download Cache Location]
-# This is where the download cache located.
-# If the folder is not exist, it will be created.
-# You can safely delete it when the program is not running.
+# outdir: download output folder path
 #     type: string
-#     default: "./tmp"
-cache-dir = "./tmp"
+#     default: "."
+outdir = "."
 
-# [Chunk Size]
-# If you don't know what is this, don't change it.
-#     type: int, (chunk-size % 1024) == 0
-#     default: 4096
+# cookies: cookies file path
+#     type: string
+#     default: "bilibili.com_cookies.txt"
+cookies = "bilibili.com_cookies.txt"
+
+# chunk-size: chunk size of downloader
+#     type: int
+#     unit: bytes
+#     default: 8192
 chunk-size = 4096
 
-# [Change CDN Host]
-# Leave it commeted unless you have network problem.
-#     type: <not set> | string
-# cdn = "upos-sz-mirrorcos.bilivideo.com"
-# cdn = "upos-sz-mirrorhw.bilivideo.com"
+# formatter-audio: formatter of audio file
+#     type: string
+#     default: "av{aid}-{p:0>3d}.{ext}"
+#     available variables: {aid} {bvid} {cid} {p} {title} {part_name} {ext}
+formatter-audio = "av{aid}-{p:0>3d}.{ext}"
 
-# section name
-#    Section name can be any value follows TOML rule. It's only an alias used by the bget tool.
-[luotianyi-2021]
-# [FID]
-# Find it in urls like https://space.bilibili.com/36081646/favlist?fid=976082846&ftype=create
-id = 1159955846
+# formatter-video: formatter of video file
+#     type: string
+#     default: "av{aid}-{p:0>3d}.mp4"
+#     available variables: {aid} {bvid} {cid} {p} {title} {part_name}
+formatter-video = "av{aid}-{p:0>3d}.mp4"
 
-# [Switches]
-# Use switch below to turn on/off download things
-# If a switch is not set, by default it is off (false)
-danmaku = true
-cover = true
-meta = true
-dash = true
-aiff = true
-flac = true
+# formatter-cover: formatter of cover picture file
+#     type: string
+#     default: "av{aid}.{ext}"
+#     available variables: {aid} {bvid} {title} {ext}
+formatter-cover = "av{aid}.{ext}"
 
-# section name #2
-[luotianyi-2020]
+# formatter-danmaku: formatter of danmaku xml file
+#     type: string
+#     default: "av{aid}-{p:0>3d}.xml"
+#     available variables: {aid} {bvid} {cid} {p} {title} {part_name}
+formatter-danmaku = "av{aid}-{p:0>3d}.xml"
+
+# formatter-meta: formatter of meta-data json file
+#     type: string
+#     default: "av{aid}.json"
+#     available variables: {aid} {bvid} {title}
+formatter-meta = "av{aid}.json"
+
+# sections
+#     section name can be costumed, which is an alias.
+#     section name is provide in section mode
+[section.luotianyi-2020]
+# id: favourite folder id
+#     type: int
+#     default: NO DEFAULT VALUE
+#     note: This is the id shown in url like https://space.bilibili.com/36081646/favlist?fid=976082846
+#           You MUST provide this value, or bget won't work.
 id = 976082846
-danmaku = false
-cover = false
-dash = true
-aiff = false
-flac = false
+
+# switches: determine which resources to download
+#     type: array[string]
+#     default: ["video", "danmaku", "meta"]
+#     acceptable item values:  "meta" | "audio" | "video" | "cover" | "danmaku"
+#     note: Please choose only one from "video" and "audio".
+#           It will work if you choose both, but the audio stream will be downloaded twice.
+switches = ["meta", "audio", "video", "cover", "danmaku"]
+
+# overwriting: global configurations can be overwritten
+outdir = "./lty-2021"
+chunk-size = 4096
+formatter-danmaku = "xml/{cid}.xml"
+
+[section.second]
+id = 1159955846
