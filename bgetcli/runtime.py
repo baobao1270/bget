@@ -36,7 +36,7 @@ class Config:
         self.chunk_size = override_config.get("chunk-size", self.chunk_size)
         self.host = override_config.get("host", self.host)
         self.switches = list_unique(override_config.get("switches", self.switches))
-        for key in ["meta", "audio", "video", "cover", "meta"]:
+        for key in ["meta", "audio", "video", "cover", "danmaku"]:
             self.formatter[key] = override_config.get("formatter-" + key, self.formatter[key])
 
     def load_args(self, args: argparse.Namespace):

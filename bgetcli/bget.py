@@ -6,7 +6,7 @@ from .runtime import Config, Runtime, SectionHead
 from . import downloader
 
 
-VERSION = "3.2.0"
+VERSION = "3.2.1"
 DEFAULT_CONFIG = Config(
     outdir=".",
     cookies="bilibili.com_cookies.txt",
