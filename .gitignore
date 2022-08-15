@@ -1,7 +1,6 @@
 # User defined
 .idea/
 tmp/
-*.venv/
 *cookies.txt
 /config.toml
 

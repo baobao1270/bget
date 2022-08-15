@@ -1,25 +1,26 @@
 import argparse
-from typing import List, Optional
+import pkg_resources
+from typing import List
 
 from .utils import auto_format
 from .runtime import Config, Runtime, SectionHead
 from . import downloader
 
 
-VERSION = "3.2.7"
+VERSION = pkg_resources.get_distribution("bget").version
 DEFAULT_CONFIG = Config(
     outdir=".",
     cookies="bilibili.com_cookies.txt",
     chunk_size=8192,
     host=None,
     formatter={
-        "audio": "av{aid}-{p:0>3d}-{title}.{ext}",
-        "video": "av{aid}-{p:0>3d}-{title}.mp4",
+        "audio": "av{aid}-P{p:0>3d} {title}.{ext}",
+        "video": "av{aid}-P{p:0>3d} {title}.mp4",
+        "danmaku": "av{aid}-P{p:0>3d}.xml",
         "cover": "av{aid}.{ext}",
-        "danmaku": "av{aid}-{cid}.xml",
         "meta": "av{aid}.json",
     },
-    switches=["video", "danmaku", "meta"]
+    switches=["video"]
 )
 
 
@@ -42,10 +43,11 @@ def parse_args() -> argparse.Namespace:
                         help="chunk size of downloader")
     parser.add_argument("--host", metavar="<host>", type=str, default=None,
                         help="override the host of stream CDN")
-    parser.add_argument("--no-meta", action="store_true", help="do not download metadata")
-    parser.add_argument("--no-danmaku", action="store_true", help="do not download danmaku")
+    parser.add_argument("--meta", action="store_true", help="download metadata")
+    parser.add_argument("--danmaku", action="store_true", help="download danmaku")
+    parser.add_argument("--cover", action="store_true", help="download cover picture")
     parser.add_argument("--audio-only", action="store_true", help="download audio only")
-    parser.add_argument("--with-cover", action="store_true", help="download cover picture")
+    parser.add_argument("--log-include-date", action="store_true", help="include date in log")
 
     # Section Mode
     parser.add_argument("-s", "--skip", metavar="<offset>", type=int, default=0,
@@ -126,7 +128,7 @@ def checkout_videos(runtime: Runtime, tasks: List) -> List[dict]:
     return videos
 
 
-@logger_tag("download")
+@logger_tag("dl")
 def download_videos(runtime: Runtime, videos: List):
     for i in range(len(videos)):
         video = videos[i]
