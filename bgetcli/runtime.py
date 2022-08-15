@@ -6,7 +6,7 @@ import toml
 import bgetlib
 import argparse
 from dataclasses import dataclass, field
-from typing import Optional, Dict, List, Tuple
+from typing import Optional, Dict, List
 from .utils import list_unique, parse_resources
 
 
@@ -44,15 +44,15 @@ class Config:
         self.outdir = args.outdir or self.outdir
         self.chunk_size = args.chunk_size or self.chunk_size
         self.host = args.host or self.host
-        if args.no_meta:
+        if args.meta:
+            self.switches.append("meta")
             self.switches = list_unique(self.switches)
-            self.switches.remove("meta")
-        if args.no_danmaku:
-            self.switches = list_unique(self.switches)
-            self.switches.remove("danmaku")
-        if args.with_cover:
-            self.switches = list_unique(self.switches)
+        if args.danmaku:
             self.switches.append("danmaku")
+            self.switches = list_unique(self.switches)
+        if args.cover:
+            self.switches.append("cover")
+            self.switches = list_unique(self.switches)
         if args.audio_only:
             self.switches.append("audio")
             self.switches = list_unique(self.switches)
@@ -84,6 +84,7 @@ class Runtime:
     log_tags: List[str] = field(init=False, default_factory=list)
 
     def __post_init__(self):
+        self.log_time_format = "%Y-%m-%d %H:%M:%S" if self.args.log_include_date else "%H:%M:%S"
         if self.resource_type == "notfound":
             self.log("Section name not found in configuration")
             sys.exit()
@@ -114,7 +115,7 @@ class Runtime:
 
     def log(self, *values, **kwargs):
         tags = "".join([f"[{tag}]" for tag in self.log_tags])
-        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}]" + tags, end="")
+        print(f"[{time.strftime(self.log_time_format)}]" + tags, end="")
         print(*values, **kwargs)
 
     def log_progress(self, *values, **kwargs):
