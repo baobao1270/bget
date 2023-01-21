@@ -44,13 +44,22 @@ def downloader(name: str, extension: str = ""):
 
 
 def get_av_stream_url(rt: Runtime, filename: str, aid: int, cid: int):
-    stream = rt.bapi.get_stream_url(aid, cid, QualityOptions(
+    quality = QualityOptions(
         h265=True,
         hdr=True,
         dolby_audio=True,
         dolby_vision=False,
         qhd_8k=True
-    ))
+    )
+    if rt.args.force_h264:
+        quality = QualityOptions(
+            h265=False,
+            hdr=False,
+            dolby_audio=False,
+            dolby_vision=False,
+            qhd_8k=False  # maybe not? but all 8k videos are h265 on bilibili
+        )
+    stream = rt.bapi.get_stream_url(aid, cid, quality)
     if rt.config.host is not None:
         stream["audio"] = utils.replace_host(stream["audio"], rt.config.host)
         stream["video"] = utils.replace_host(stream["video"], rt.config.host)
