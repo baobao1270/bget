@@ -1,6 +1,12 @@
+import os
+import sys
+import shutil
 import argparse
+import bgetlib
 import pkg_resources
+import base64
 from typing import List
+from enum import IntEnum
 
 from .utils import auto_format
 from .runtime import Config, Runtime, SectionHead
@@ -22,6 +28,12 @@ DEFAULT_CONFIG = Config(
     },
     switches=["video"]
 )
+FLAC_CHECKER = [
+    "BV1dZ4y1Y7bt",  # 光与影的对白      FLAC_CAPABLE
+    "BV1Z8411A7NH",  # 夏语遥AI 《诗》   FLAC_NEED_VIP
+]
+WINDOWS_FFMPEG = "KiBXaW5kb3dzIFtXaW5kb3dzIDEwIDIwSDIgYWJvdmUgb25seV06CiAgIGEuIFN5c3RlbSB3aWRlLCBmb3IgYWxsIHVzZXIsIHJ1biBhcyBhZG1pbmlzdHJhdG9yCiAgICAgIGN1cmwgaHR0cHM6Ly9pbWFnZS1ob3N0LTEyNTExMzE1NDUuZmlsZS5teXFjbG91ZC5jb20vYnktdXVpZC9lMDM4YmIxOC00NzVjLTQ4YjItODA2Yy00Nzc1ZGNjYzZkYTAvMjAyMy0wMS0yMS0wNS0wNy00NS11dGMtMTY3NDI3NzY2NS9mZm1wZWcuZXhlIC1vIEM6XFdpbmRvd3NcU3lzdGVtMzJcZmZtcGVnLmV4ZQogICBiLiBJbnN0YWxsIGZvciBjdXJyZW50IGRpcmVjdG9yeSBvbmx5CiAgICAgIGN1cmwgaHR0cHM6Ly9pbWFnZS1ob3N0LTEyNTExMzE1NDUuZmlsZS5teXFjbG91ZC5jb20vYnktdXVpZC9lMDM4YmIxOC00NzVjLTQ4YjItODA2Yy00Nzc1ZGNjYzZkYTAvMjAyMy0wMS0yMS0wNS0wNy00NS11dGMtMTY3NDI3NzY2NS9mZm1wZWcuZXhlIC1vIGZmbXBlZy5leGUKCg=="
+WINDOWS_FFMPEG = base64.b64decode(WINDOWS_FFMPEG).decode("utf-8").strip().splitlines()
 
 
 def parse_args() -> argparse.Namespace:
@@ -35,7 +47,7 @@ def parse_args() -> argparse.Namespace:
     # common settings
     parser.add_argument("--config", metavar="<config>", type=str, default=None,
                         help="config file path")
-    parser.add_argument("-k", "--cookies", metavar="<cookies>", type=str, default=None,
+    parser.add_argument("-k", "--cookies", metavar="<cookies>", type=str, default=DEFAULT_CONFIG.cookies,
                         help="cookies file path")
     parser.add_argument("-o", "--outdir", action="store", metavar="<outdir>", type=str, default=None,
                         help="download output folder path")
@@ -55,11 +67,88 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--section", action="store_true", help="enable section mode")
     parser.add_argument("--section-head", metavar="<head>", type=str, default="head.json",
                         help="section mode: path to head")
+    parser.add_argument("--force-h264", action="store_true", default=False, help="section mode: force downloading h264 stream")
     return parser.parse_args()
+
+
+def check_ffmpeg():
+    ffmpeg = shutil.which("ffmpeg")
+    if (ffmpeg is None) or (ffmpeg == ""):
+        print("""
+        bgetcli tool error: FFMPEG NOT FOUND !!!
+        Please install ffmpeg first. You can download it by command below:
+        {}
+        {}
+        {}
+        {}
+        {}
+        * Debian/Ubuntu:    apt install ffmpeg
+        * Arch Linux:       pacman -S ffmpeg
+        * macOS:            brew install ffmpeg
+        """.format(*WINDOWS_FFMPEG))
+        sys.exit(-1)
+    print(f"Found ffmpeg at: {ffmpeg}")
+
+
+def ensure_cookies_exist(cookies_path: str):
+    if os.path.exists(cookies_path):
+        print(f"Found cookies file at: {cookies_path}")
+        return
+    print(f"Cookies file not found: {cookies_path}")
+    print("Creating an empty cookies file.")
+    with open(cookies_path, "w+") as f:
+        # Create an empty cookies file
+        f.write("# Netscape HTTP Cookie File\n\n")
+
+
+class FLACState(IntEnum):
+    FLAC_NOT_PRESENT = 0
+    FLAC_LOCKED = 1
+    FLAC_OK = 2
+    FLAC_NEED_LOGIN = 0x7120CCCC
+    FLAC_NEED_VIP = 0x7120FFFF
+
+
+def check_flac(cookies_file: str):
+    def check_flac_video(bvid: str):
+        print(f"Checking FLAC with bvid: {bvid}", end="\t")
+        bapi = bgetlib.BilibiliAPI(cookies_file)
+        cid = bapi._interface_request(f"/x/player/pagelist?bvid={bvid}")["data"][0]["cid"]
+        print(f"cid={cid}", end="\t")
+        flac = bapi._interface_request(f"/x/player/playurl?bvid={bvid}&cid={cid}&fnver=0&fnval=1168&fourk=1")["data"]["dash"].get("flac")
+        if flac is None:
+            print("FLAC_NOT_PRESENT")
+            return FLACState.FLAC_NOT_PRESENT
+        if flac.get("display"):
+            if (flac.get("audio") or {}).get("baseUrl"):
+                print("FLAC_OK")
+                return FLACState.FLAC_OK
+            else:
+                print("FLAC_LOCKED")
+                return FLACState.FLAC_LOCKED
+        return FLACState.FLAC_NOT_PRESENT
+    
+    flac_check_0 = check_flac_video(FLAC_CHECKER[0])
+    flac_check_1 = check_flac_video(FLAC_CHECKER[1])
+    if flac_check_0 == FLACState.FLAC_OK and flac_check_1 == FLACState.FLAC_OK:
+        print("FLAC_OK: FLAC/HiRes check passed.")
+        return FLACState.FLAC_OK
+    if flac_check_0 == FLACState.FLAC_LOCKED and flac_check_1 == FLACState.FLAC_LOCKED:
+        print("FLAC_NEED_LOGIN: You have to login to download FLAC/HiRes.")
+        return FLACState.FLAC_NEED_LOGIN
+    if flac_check_0 == FLACState.FLAC_OK and flac_check_1 == FLACState.FLAC_LOCKED:
+        print("FLAC_NEED_VIP: You have to be a VIP or paid to download all FLAC/HiRes, but you can still download free FLAC content (example: https://b23.tv/BV1dZ4y1Y7bt ).")
+        return FLACState.FLAC_NEED_VIP
+    print("FLAC_NOT_PRESENT: FLAC/HiRes check failed. Unknown error.")
+    return FLACState.FLAC_NOT_PRESENT
 
 
 def main():
     args = parse_args()
+    check_ffmpeg()
+    ensure_cookies_exist(args.cookies)
+    if args.resource == "check-account":
+        return check_flac(args.cookies)
     runtime = Runtime.factory(args, DEFAULT_CONFIG)
     section_head = SectionHead(runtime)
     download_tasks = generate_tasks(runtime, section_head)

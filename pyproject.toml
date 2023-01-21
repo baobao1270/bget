@@ -7,7 +7,7 @@ bget = 'bgetcli.bget:main'
 
 [tool.poetry]
 name = "bget"
-version = "10.0.0"
+version = "10.1.0"
 description = "bget - a python bilibili favourites batch downloader"
 authors = ["Joseph Chris <joseph@josephcz.xyz>"]
 license = "MIT"
